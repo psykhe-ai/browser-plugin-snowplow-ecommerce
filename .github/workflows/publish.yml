@@ -1,4 +1,4 @@
-name: Publish package to GitHub Packages
+name: Publish package to npm
 
 on:
   release:
@@ -14,16 +14,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 8
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20.x'
           registry-url: 'https://registry.npmjs.org'
 
-      - run: pnpm install
-      - run: pnpm publish --access public
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm publish --access public --no-git-checks
         env:
           NPM_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
