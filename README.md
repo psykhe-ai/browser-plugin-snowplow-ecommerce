@@ -1,37 +1,27 @@
 # @psykhe-ai/browser-plugin-snowplow-ecommerce
 
-Snowplow plugin for tracking ecommerce events on PSYKHE AI-powered shops.
+Snowplow plugin for tracking ecommerce events on storefronts that use PSYKHE AI recommendations.
 
-> Designed for all storefronts with integrated PSYKHE AI recommendations.
+## Prerequisites
 
----
+- **Snowplow JavaScript Tracker 4.5.0** with **session context enabled**.
 
-## 📋 Prerequisites
+## Features
 
-* **Snowplow JavaScript Tracker 4.5.0** with **enabled session context**.
+- Tracks product views, clicks, cart changes, checkout steps, dwell, and transactions
+- Attaches PSYKHE AI recommendation context to Snowplow ecommerce events
+- Compatible with [@snowplow/browser-tracker](https://www.npmjs.com/package/@snowplow/browser-tracker)
 
----
-
-## ✨ Features
-
-* Tracks product views, clicks, cart changes, checkout steps, dwell, and transactions
-* Automatically attaches PSYKHE AI recommendation contexts
-* Built for [@snowplow/browser-tracker](https://www.npmjs.com/package/@snowplow/browser-tracker)
-
----
-
-## 📦 Installation
+## Installation
 
 ```bash
 pnpm add @psykhe-ai/browser-plugin-snowplow-ecommerce
 ```
 
----
-
-## 🚀 Usage
+## Usage
 
 <details>
-<summary>Tracker Initialization</summary>
+<summary>Tracker initialization</summary>
 
 ```ts
 import { newTracker } from '@snowplow/browser-tracker';
@@ -40,7 +30,7 @@ import { PsykheSnowplowEcommercePlugin } from '@psykhe-ai/browser-plugin-snowplo
 const PSYKHE_BASE_URL = 'https://api.psykhe.dev';
 const POST_PATH = '/v1/collector';
 
-// Client identifier, e.g. "store-name.com"
+// Client identifier, e.g. 'store-name.com'
 const clientIdentifier = 'store-name.com';
 
 newTracker('psykhe-ai', PSYKHE_BASE_URL, {
@@ -66,20 +56,17 @@ newTracker('psykhe-ai', PSYKHE_BASE_URL, {
 
 </details>
 
----
-
 ### Seed Snowplow `domain_userid` (optional)
 
-Seeding `domain_userid` is a **special case**. For most integrations, omit it and let Snowplow generate and manage
-`domain_userid` on its own — that is the recommended setup. Expand the section below only when a client explicitly wants
-Snowplow to reuse an identifier that already exists in their storefront.
+Seeding `domain_userid` is optional and uncommon. Most integrations should omit it and let Snowplow generate and manage
+`domain_userid`. Use this helper only when Snowplow must reuse an identifier that already exists in the storefront.
 
 <details>
 <summary>Reuse an existing <code>domain_userid</code></summary>
 
-Snowplow's browser tracker does not expose a public initialization option for `domain_userid`. To make Snowplow reuse
-an existing identifier, call `seedSnowplowDomainUserId()` immediately before `newTracker()`, using the same storage
-options for both calls.
+Snowplow's browser tracker does not expose a public initialization option for `domain_userid`. To reuse an existing
+identifier, call `seedSnowplowDomainUserId()` immediately before `newTracker()`, using the same storage options for both
+calls.
 
 ```ts
 import { newTracker } from '@snowplow/browser-tracker';
@@ -88,20 +75,22 @@ import {
   seedSnowplowDomainUserId,
 } from '@psykhe-ai/browser-plugin-snowplow-ecommerce';
 
+const PSYKHE_BASE_URL = 'https://api.psykhe.dev';
+
 // Use the same storage options for the seed call and `newTracker()` so the
 // seeded state is the one Snowplow reads back.
 const cookieName = '_psykhe_';
 const cookieDomain = document.location.hostname;
 const stateStorageStrategy = 'cookieAndLocalStorage';
 
-const { seeded } = seedSnowplowDomainUserId('your-existing-user-identifier', {
+const { seeded } = seedSnowplowDomainUserId('06be9692-4f70-4887-be27-15e98fdfc7c8', {
   cookieName,
   cookieDomain,
   stateStorageStrategy,
 });
 
 newTracker('psykhe-ai', PSYKHE_BASE_URL, {
-  // ...same config as "Tracker Initialization" above...
+  // Same config as the tracker initialization example above.
   cookieName,
   cookieDomain,
   stateStorageStrategy,
@@ -111,67 +100,62 @@ newTracker('psykhe-ai', PSYKHE_BASE_URL, {
 
 Pass the same storage-related options to `seedSnowplowDomainUserId()` that you pass to `newTracker()`, especially
 `cookieName`, `cookieDomain`, `cookieSecure`, `cookieLifetime`, `sessionCookieTimeout`, and `stateStorageStrategy`. By
-default the helper does not replace an existing Snowplow visitor state value; pass `overwriteExisting: true` only when
+default, the helper does not replace an existing Snowplow visitor state value. Pass `overwriteExisting: true` only when
 you intentionally want to replace it.
 
-**Re-seeding is a no-op by default.** Once a `domain_userid` exists for these storage options — whether you seeded it on
-an earlier load or Snowplow already created one — a later call with a *different* identifier is rejected: the existing
-identifier stays in use and the call returns `{ seeded: false }`. This makes `seedSnowplowDomainUserId()` safe to run on
-every page load. Pass `overwriteExisting: true` only when you deliberately want the new identifier to win.
+**Re-seeding is a no-op by default.** Once a `domain_userid` exists for these storage options, whether you seeded it on
+an earlier load or Snowplow already created one, a later call with a _different_ identifier leaves the existing
+identifier in use and returns `{ seeded: false }`. This makes `seedSnowplowDomainUserId()` safe to run on every page
+load. Pass `overwriteExisting: true` only when the new identifier should replace the existing value.
 
 This helper mirrors Snowplow Browser Tracker 4.5.0's first-party state format because Snowplow does not export the
-parser/serializer used during initialization. Re-check the linked Snowplow source comments in the package before
+parser/serializer used during initialization. Re-check the Snowplow source links in `src/domain-user-id.ts` before
 upgrading Snowplow.
 
 The identifier must not contain dots, whitespace, or semicolons because Snowplow stores it inside a dot-delimited
 first-party state value.
 
-The call returns a `{ seeded }` flag. Check it: `seeded` is `false` when nothing was written — for example with the
-default `cookieSecure: true` over plain `http` (the browser rejects the secure cookie), or when an existing value was
-left in place without `overwriteExisting: true`.
+The call returns a `{ seeded }` flag. Use it to detect when nothing was written, for example with the default
+`cookieSecure: true` over plain `http` (the browser rejects the secure cookie), or when an existing value was left in
+place without `overwriteExisting: true`.
 
 </details>
 
-### ℹ️ About PSYKHE AI recommendation context
+### PSYKHE AI recommendation context
 
-If your product listings or search results come from PSYKHE AI, include the `recommendationId` using the
-`withRecommendIdCtx` context helper. This ensures better downstream analytics by linking user interactions to specific
-recommendation or search result contexts.
+When a product listing or search result comes from PSYKHE AI, pass the `recommendationId` with the
+`withRecommendIdCtx` context helper. This links interaction events to the recommendation or search result that produced
+them.
 
 ### Helper functions
 
-The plugin exports **helper functions** for every event listed in
-the [Event Categories](https://docs.psykhe.dev/api/tracking-api/getting-started). Each helper is a thin wrapper that
-builds the
-correct Snowplow self‑describing event and attaches Psykhe AI contexts.
+The plugin exports a helper function for each event listed in
+the [Event Categories](https://docs.psykhe.dev/api/tracking-api/getting-started). Each helper builds the Snowplow
+self-describing event and attaches PSYKHE AI contexts.
 
 | Helper                    | Event captured                      |
-|---------------------------|-------------------------------------|
+| ------------------------- | ----------------------------------- |
 | `trackProductView()`      | Product Page View (mandatory)       |
 | `trackProductListView()`  | Product List Impression (mandatory) |
 | `trackAddToCart()`        | Add to Cart (mandatory)             |
 | `trackTransaction()`      | Complete Transaction (mandatory)    |
 | `trackProductDwellTime()` | PDP/PLP dwell time (recommended)    |
 
-Remember to **filter dwell/hover durations** (≥ 300 ms) as described in Getting Started → Quality Filters.
+Filter dwell and hover durations as described in Getting Started > Quality Filters.
 
-If your product listings or search results come from PSYKHE AI, include a `recommendationId` using the
-`withRecommendIdCtx` context helper. This ensures better downstream analytics by linking user interactions to specific
-recommendation or search result contexts.
+### Track events
 
-### 2. Track events
-
-#### ➤ Set user identity
+#### Set user identity
 
 You can call `setEcommerceUser()` once when the tracker is initialized, and again when the user logs in or logs out, to
-ensure the correct identity is always associated with events.
+keep event identity current.
 
 ```ts
-import { setEcommerceUser } from "@psykhe-ai/browser-plugin-snowplow-ecommerce";
+import { setEcommerceUser } from '@psykhe-ai/browser-plugin-snowplow-ecommerce';
 
 setEcommerceUser({
-  id: "user-identifier",
-  is_guest: false
+  id: 'user-identifier',
+  is_guest: false,
 });
 ```
 
@@ -179,13 +163,14 @@ setEcommerceUser({
 <summary>Product view (PDP)</summary>
 
 ```ts
-import { trackProductView } from "@psykhe-ai/browser-plugin-snowplow-ecommerce";
+import { trackProductView } from '@psykhe-ai/browser-plugin-snowplow-ecommerce';
 
 trackProductView({
-  product_id: "product-identifier",
-  name: "Product Name",
+  product_id: 'sku-123',
+  variant_id: 'sku-123-white',
+  name: 'Linen Shirt',
   price: 100,
-  currency: "usd"
+  currency: 'usd',
 });
 ```
 
@@ -194,22 +179,22 @@ trackProductView({
 <details>
 <summary>Product dwell time</summary>
 
-
-> ℹ️ It is recommended to filter out events shorter than 300ms (e.g., user scrolls past without viewing) or longer than
-> 5 minutes (e.g., user left the tab open) to ensure data quality.
+> Filter out events shorter than 300 ms (for example, a user scrolling past without viewing) or longer than 5 minutes
+> (for example, a user leaving the tab open).
 
 ```ts
-import { trackProductDwellTime, PageType } from "@psykhe-ai/browser-plugin-snowplow-ecommerce";
+import { trackProductDwellTime, PageType } from '@psykhe-ai/browser-plugin-snowplow-ecommerce';
 
 trackProductDwellTime({
   product: {
-    product_id: "product-identifier-2",
-    name: "Product Name",
+    product_id: 'sku-124',
+    variant_id: 'sku-124-blue',
+    name: 'Cotton Dress',
     price: 100,
-    currency: "usd"
+    currency: 'usd',
   },
   duration: 500,
-  pageType: PageType.PDP
+  pageType: PageType.PDP,
 });
 ```
 
@@ -219,23 +204,50 @@ trackProductDwellTime({
 <summary>Product list view (PLP)</summary>
 
 ```ts
-import { trackProductListView, withRecommendIdCtx } from "@psykhe-ai/browser-plugin-snowplow-ecommerce";
+import {
+  trackProductListView,
+  withRecommendIdCtx,
+} from '@psykhe-ai/browser-plugin-snowplow-ecommerce';
 
 trackProductListView({
-  name: "dresses",
+  name: 'dresses',
   products: [
-    { product_id: "product-id-1", variant_id: "product-v-1", name: "Product Name", price: 100, currency: "usd" },
-    { product_id: "product-id-2", variant_id: "product-v-2", name: "Product Name", price: 100, currency: "usd" }
-  ]
+    {
+      product_id: 'sku-201',
+      variant_id: 'sku-201-black',
+      name: 'Silk Dress',
+      price: 180,
+      currency: 'usd',
+    },
+    {
+      product_id: 'sku-202',
+      variant_id: 'sku-202-blue',
+      name: 'Cotton Dress',
+      price: 120,
+      currency: 'usd',
+    },
+  ],
 });
 
 trackProductListView({
-  name: "dresses",
+  name: 'dresses',
   products: [
-    { product_id: "product-id-1", variant_id: "product-v-1", name: "Product Name", price: 100, currency: "usd" },
-    { product_id: "product-id-2", variant_id: "product-v-2", name: "Product Name", price: 100, currency: "usd" }
+    {
+      product_id: 'sku-201',
+      variant_id: 'sku-201-black',
+      name: 'Silk Dress',
+      price: 180,
+      currency: 'usd',
+    },
+    {
+      product_id: 'sku-202',
+      variant_id: 'sku-202-blue',
+      name: 'Cotton Dress',
+      price: 120,
+      currency: 'usd',
+    },
   ],
-  context: [withRecommendIdCtx("recoId1")]
+  context: [withRecommendIdCtx('recommendation-id-001')],
 });
 ```
 
@@ -244,21 +256,21 @@ trackProductListView({
 <details>
 <summary>Product dwell time on PLP</summary>
 
-
-> ℹ️ It is recommended to filter out events shorter than 300ms (e.g., user scrolls past without viewing) or longer than
-> 5 minutes (e.g., user left the tab open) to ensure data quality.
+> Filter out events shorter than 300 ms (for example, a user scrolling past without viewing) or longer than 5 minutes
+> (for example, a user leaving the tab open).
 
 ```ts
 trackProductDwellTime({
   product: {
-    product_id: "product-identifier-2",
-    name: "Product Name",
-    price: 100,
-    currency: "usd"
+    product_id: 'sku-202',
+    variant_id: 'sku-202-blue',
+    name: 'Cotton Dress',
+    price: 120,
+    currency: 'usd',
   },
   duration: 400,
   pageType: PageType.PLP,
-  context: [withRecommendIdCtx("recoId1")]
+  context: [withRecommendIdCtx('recommendation-id-001')],
 });
 ```
 
@@ -268,31 +280,31 @@ trackProductDwellTime({
 <summary>Product list click</summary>
 
 ```ts
-import { trackListClick } from "@psykhe-ai/browser-plugin-snowplow-ecommerce";
+import { trackListClick } from '@psykhe-ai/browser-plugin-snowplow-ecommerce';
 
 trackListClick({
-  productList: "collection-handle",
+  productList: 'collection-handle',
   product: {
-    product_id: "product-id-3",
-    variant_id: "product-v-3",
+    product_id: 'sku-203',
+    variant_id: 'sku-203-green',
     position: 10,
-    name: "Product Name",
-    price: 100,
-    currency: "usd"
+    name: 'Wrap Dress',
+    price: 150,
+    currency: 'usd',
   },
-  context: [withRecommendIdCtx("recoId2")]
+  context: [withRecommendIdCtx('recommendation-id-002')],
 });
 
 trackListClick({
-  productList: "collection-handle",
+  productList: 'collection-handle',
   product: {
-    product_id: "product-id-4",
-    variant_id: "product-v-1",
+    product_id: 'sku-201',
+    variant_id: 'sku-201-black',
     position: 10,
-    name: "Product Name",
-    price: 100,
-    currency: "usd"
-  }
+    name: 'Silk Dress',
+    price: 180,
+    currency: 'usd',
+  },
 });
 ```
 
@@ -302,67 +314,66 @@ trackListClick({
 <summary>Add to cart</summary>
 
 ```ts
-import { trackAddToCart } from "@psykhe-ai/browser-plugin-snowplow-ecommerce";
+import { trackAddToCart } from '@psykhe-ai/browser-plugin-snowplow-ecommerce';
 
 trackAddToCart({
-  cart_id: "cart-id",
+  cart_id: 'cart-id',
   total_value: 1000,
-  currency: "usd",
+  currency: 'usd',
   products: [
     {
-      product_id: "product-id-3",
-      variant_id: "product-v-3",
+      product_id: 'sku-203',
+      variant_id: 'sku-203-green',
       position: 11,
       quantity: 1,
-      name: "Product Name",
-      price: 100,
-      currency: "usd"
-    }
+      name: 'Wrap Dress',
+      price: 150,
+      currency: 'usd',
+    },
   ],
-  context: [withRecommendIdCtx("recoId3")]
+  context: [withRecommendIdCtx('recommendation-id-003')],
 });
 
 trackAddToCart({
-  cart_id: "cart-id",
+  cart_id: 'cart-id',
   total_value: 1000,
-  currency: "usd",
+  currency: 'usd',
   products: [
     {
-      product_id: "product-id-3",
-      variant_id: "product-v-3",
+      product_id: 'sku-301',
+      variant_id: 'sku-301-white',
       quantity: 1,
-      name: "cool shirt",
+      name: 'Oxford Shirt',
       price: 500,
-      currency: "usd"
-    }
+      currency: 'usd',
+    },
   ],
-  context: [withRecommendIdCtx("recoId3")]
+  context: [withRecommendIdCtx('recommendation-id-003')],
 });
 ```
 
 </details>
 
-
 <details>
 <summary>Remove from cart</summary>
 
 ```ts
-import { trackRemoveFromCart } from "@psykhe-ai/browser-plugin-snowplow-ecommerce";
+import { trackRemoveFromCart } from '@psykhe-ai/browser-plugin-snowplow-ecommerce';
 
 trackRemoveFromCart({
-  cart_id: "cart-id",
+  cart_id: 'cart-id',
   total_value: 900,
-  currency: "usd",
+  currency: 'usd',
   products: [
     {
-      product_id: "product-id-3",
-      variant_id: "product-v-3",
+      product_id: 'sku-203',
+      variant_id: 'sku-203-green',
       quantity: 1,
-      name: "Product Name",
-      price: 100,
-      currency: "usd"
-    }
-  ]
+      name: 'Wrap Dress',
+      price: 150,
+      currency: 'usd',
+    },
+  ],
 });
 ```
 
@@ -372,51 +383,50 @@ trackRemoveFromCart({
 <summary>Checkout steps</summary>
 
 ```ts
-import { trackCheckoutStep } from "@psykhe-ai/browser-plugin-snowplow-ecommerce";
+import { trackCheckoutStep } from '@psykhe-ai/browser-plugin-snowplow-ecommerce';
 
 trackCheckoutStep({
   step: 1,
-  account_type: "customer"
+  account_type: 'customer',
 });
 
 trackCheckoutStep({
   step: 1,
-  account_type: "guest"
+  account_type: 'guest',
 });
 ```
 
 </details>
 
-
 <details>
 <summary>Complete transaction</summary>
 
 ```ts
-import { trackTransaction } from "@psykhe-ai/browser-plugin-snowplow-ecommerce";
+import { trackTransaction } from '@psykhe-ai/browser-plugin-snowplow-ecommerce';
 
 trackTransaction({
-  currency: "usd",
+  currency: 'usd',
   revenue: 1100,
-  transaction_id: "transaction-id-123",
+  transaction_id: 'transaction-id-123',
   total_quantity: 2,
   products: [
     {
-      product_id: "product-id-3",
-      variant_id: "product-v-3",
+      product_id: 'sku-301',
+      variant_id: 'sku-301-white',
       quantity: 1,
       price: 600,
-      currency: "usd",
-      name: "Product Name"
+      currency: 'usd',
+      name: 'Oxford Shirt',
     },
     {
-      product_id: "product-id-3",
-      variant_id: "product-v-4",
+      product_id: 'sku-302',
+      variant_id: 'sku-302-navy',
       quantity: 1,
       price: 500,
-      currency: "usd",
-      name: "Product Name"
-    }
-  ]
+      currency: 'usd',
+      name: 'Wool Jacket',
+    },
+  ],
 });
 ```
 
@@ -426,26 +436,22 @@ trackTransaction({
 <summary>Track site search</summary>
 
 ```ts
-import { trackSiteSearch } from "@psykhe-ai/browser-plugin-snowplow-ecommerce";
+import { trackSiteSearch } from '@psykhe-ai/browser-plugin-snowplow-ecommerce';
 
 trackSiteSearch({
-  query: "cool shirt",
-  results_count: 128
+  query: 'linen shirt',
+  results_count: 128,
 });
 
 trackSiteSearch({
-  query: "cool shirt",
+  query: 'linen shirt',
   results_count: 128,
-  context: [withRecommendIdCtx("recoId10")]
+  context: [withRecommendIdCtx('recommendation-id-010')],
 });
 ```
 
 </details>
 
----
-
-## 🧪 Development
+## Development
 
 - Build with `pnpm build`
-
----
