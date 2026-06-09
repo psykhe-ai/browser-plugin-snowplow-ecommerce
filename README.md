@@ -8,7 +8,7 @@ Snowplow plugin for tracking ecommerce events on PSYKHE AI-powered shops.
 
 ## 📋 Prerequisites
 
-* **Snowplow JavaScript Tracker ≥ 4.5.0** with **enabled session context**.
+* **Snowplow JavaScript Tracker 4.5.0** with **enabled session context**.
 
 ---
 
@@ -67,6 +67,70 @@ newTracker('psykhe-ai', PSYKHE_BASE_URL, {
 </details>
 
 ---
+
+### Seed Snowplow `domain_userid` (optional)
+
+Seeding `domain_userid` is a **special case**. For most integrations, omit it and let Snowplow generate and manage
+`domain_userid` on its own — that is the recommended setup. Expand the section below only when a client explicitly wants
+Snowplow to reuse an identifier that already exists in their storefront.
+
+<details>
+<summary>Reuse an existing <code>domain_userid</code></summary>
+
+Snowplow's browser tracker does not expose a public initialization option for `domain_userid`. To make Snowplow reuse
+an existing identifier, call `seedSnowplowDomainUserId()` immediately before `newTracker()`, using the same storage
+options for both calls.
+
+```ts
+import { newTracker } from '@snowplow/browser-tracker';
+import {
+  PsykheSnowplowEcommercePlugin,
+  seedSnowplowDomainUserId,
+} from '@psykhe-ai/browser-plugin-snowplow-ecommerce';
+
+// Use the same storage options for the seed call and `newTracker()` so the
+// seeded state is the one Snowplow reads back.
+const cookieName = '_psykhe_';
+const cookieDomain = document.location.hostname;
+const stateStorageStrategy = 'cookieAndLocalStorage';
+
+const { seeded } = seedSnowplowDomainUserId('your-existing-user-identifier', {
+  cookieName,
+  cookieDomain,
+  stateStorageStrategy,
+});
+
+newTracker('psykhe-ai', PSYKHE_BASE_URL, {
+  // ...same config as "Tracker Initialization" above...
+  cookieName,
+  cookieDomain,
+  stateStorageStrategy,
+  plugins: [PsykheSnowplowEcommercePlugin()],
+});
+```
+
+Pass the same storage-related options to `seedSnowplowDomainUserId()` that you pass to `newTracker()`, especially
+`cookieName`, `cookieDomain`, `cookieSecure`, `cookieLifetime`, `sessionCookieTimeout`, and `stateStorageStrategy`. By
+default the helper does not replace an existing Snowplow visitor state value; pass `overwriteExisting: true` only when
+you intentionally want to replace it.
+
+**Re-seeding is a no-op by default.** Once a `domain_userid` exists for these storage options — whether you seeded it on
+an earlier load or Snowplow already created one — a later call with a *different* identifier is rejected: the existing
+identifier stays in use and the call returns `{ seeded: false }`. This makes `seedSnowplowDomainUserId()` safe to run on
+every page load. Pass `overwriteExisting: true` only when you deliberately want the new identifier to win.
+
+This helper mirrors Snowplow Browser Tracker 4.5.0's first-party state format because Snowplow does not export the
+parser/serializer used during initialization. Re-check the linked Snowplow source comments in the package before
+upgrading Snowplow.
+
+The identifier must not contain dots, whitespace, or semicolons because Snowplow stores it inside a dot-delimited
+first-party state value.
+
+The call returns a `{ seeded }` flag. Check it: `seeded` is `false` when nothing was written — for example with the
+default `cookieSecure: true` over plain `http` (the browser rejects the secure cookie), or when an existing value was
+left in place without `overwriteExisting: true`.
+
+</details>
 
 ### ℹ️ About PSYKHE AI recommendation context
 

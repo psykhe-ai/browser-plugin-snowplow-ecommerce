@@ -14,13 +14,17 @@
     "access": "public"
   },
   "type": "module",
+  "packageManager": "pnpm@11.4.0",
   "files": [
     "dist",
     "src"
   ],
   "scripts": {
+    "check:snowplow-version": "node scripts/check-snowplow-version.mjs",
+    "prebuild": "pnpm check:snowplow-version",
     "build": "tsc",
     "prepublishOnly": "pnpm build",
+    "test": "vitest run",
     "lint": "eslint 'src/**/*.{ts,tsx}' --max-warnings=0"
   },
   "repository": {
@@ -29,22 +33,30 @@
   },
   "author": "PSYKHE AI",
   "dependencies": {
-    "@snowplow/browser-tracker-core": "^4.5.0",
-    "@snowplow/tracker-core": "^4.5.0",
-    "tslib": "^2.8.1"
+    "@snowplow/browser-tracker-core": "4.5.0",
+    "@snowplow/tracker-core": "4.5.0",
+    "sha1": "^1.1.1",
+    "uuid": "^10.0.0"
+  },
+  "peerDependencies": {
+    "@snowplow/browser-tracker": ">=4.5.0 <5.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.24.0",
+    "@snowplow/browser-tracker": "4.5.0",
+    "@types/sha1": "^1.1.5",
+    "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.29.1",
     "@typescript-eslint/parser": "^8.29.1",
     "eslint": "^9.24.0",
     "eslint-plugin-import": "^2.31.0",
+    "jsdom": "^29.1.1",
     "typescript": "^5.3.3",
-    "typescript-eslint": "^8.29.1"
+    "typescript-eslint": "^8.29.1",
+    "vitest": "^4.1.8"
   },
   "engines": {
-    "node": ">=20.0.0",
-    "pnpm": ">=10.0.0"
+    "node": ">=20.0.0"
   },
   "license": "BSD-3-Clause"
 }
