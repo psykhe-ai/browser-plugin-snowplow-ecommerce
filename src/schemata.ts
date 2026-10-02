@@ -16,3 +16,6 @@ export const PSYKHE_RECOMMENDATIONS_SCHEMA =
 
 export const PSYKHE_PRODUCT_DWELL_TIME_SCHEMA =
   'iglu:com.psykhe/product_dwell_time/jsonschema/1-0-0';
+
+export const EXPERIMENT_SCHEMA = 'iglu:com.psykhe/experiment/jsonschema/1-0-0';
+export const EXPERIMENT_EXPOSURE_SCHEMA = 'iglu:com.psykhe/experiment_exposure/jsonschema/1-0-0';

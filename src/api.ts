@@ -1,7 +1,12 @@
 import { BrowserPlugin, BrowserTracker, dispatchToTrackersInCollection } from '@snowplow/browser-tracker-core';
 import { SelfDescribingJson } from '@snowplow/tracker-core';
 
-import { buildDwellTimeEvent, buildEcommerceActionEvent } from './core.js';
+import {
+  buildDwellTimeEvent,
+  buildEcommerceActionEvent,
+  buildExperimentExposureEvent,
+} from './core.js';
+import { buildEventContexts } from './experiments.js';
 import {
   CART_SCHEMA,
   CHECKOUT_STEP_SCHEMA,
@@ -17,6 +22,7 @@ import {
   Cart,
   CheckoutStep,
   CommonEcommerceEventProperties,
+  ExperimentExposure,
   ListViewEvent,
   Page as PageContext,
   Product,
@@ -46,6 +52,24 @@ export function PsykheSnowplowEcommercePlugin(): BrowserPlugin {
   };
 }
 
+/** Report exposure to every experiment involved in the caller's chosen condition. */
+export function trackExperimentExposure(
+  exposure: ExperimentExposure,
+  trackers: Array<string> = Object.keys(_trackers),
+) {
+  const { experiments, context: customContext, timestamp, trigger } = exposure;
+  if (!Array.isArray(experiments) || experiments.length === 0) {
+    throw new TypeError('Experiment exposure requires at least one experiment');
+  }
+  if (trigger !== undefined && (typeof trigger !== 'string' || [...trigger].length > 128)) {
+    throw new TypeError('trigger must be a string of up to 128 characters');
+  }
+  const context = buildEventContexts(customContext, experiments);
+  dispatchToTrackersInCollection(trackers, _trackers, (t) => {
+    t.core.track(buildExperimentExposureEvent(trigger), context, timestamp);
+  });
+}
+
 /**
  * Track a checkout step
  *
@@ -56,7 +80,8 @@ export function trackCheckoutStep(
   checkoutStep: CheckoutStep & CommonEcommerceEventProperties,
   trackers: Array<string> = Object.keys(_trackers),
 ) {
-  const { context = [], timestamp, ...checkoutStepAttributes } = checkoutStep;
+  const { context: customContext, experiments, timestamp, ...checkoutStepAttributes } = checkoutStep;
+  const context = buildEventContexts(customContext, experiments);
   context.push({ schema: CHECKOUT_STEP_SCHEMA, data: { ...checkoutStepAttributes } });
 
   dispatchToTrackersInCollection(trackers, _trackers, (t) => {
@@ -74,7 +99,8 @@ export function trackProductListView(
   listView: ListViewEvent & CommonEcommerceEventProperties,
   trackers: Array<string> = Object.keys(_trackers),
 ) {
-  const { context = [], timestamp, products = [], name } = listView;
+  const { context: customContext, experiments, timestamp, products = [], name } = listView;
+  const context = buildEventContexts(customContext, experiments);
   products.forEach((product) => context.push({ schema: PRODUCT_SCHEMA, data: { ...product } }));
 
   dispatchToTrackersInCollection(trackers, _trackers, (t) => {
@@ -92,7 +118,8 @@ export function trackProductView(
   productView: Product & CommonEcommerceEventProperties,
   trackers: Array<string> = Object.keys(_trackers),
 ) {
-  const { context = [], timestamp, ...product } = productView;
+  const { context: customContext, experiments, timestamp, ...product } = productView;
+  const context = buildEventContexts(customContext, experiments);
   context.push({ schema: PRODUCT_SCHEMA, data: { ...product } });
 
   dispatchToTrackersInCollection(trackers, _trackers, (t) => {
@@ -104,7 +131,8 @@ export function trackListClick(
   listClickEvent: ListClickEvent & CommonEcommerceEventProperties,
   trackers: Array<string> = Object.keys(_trackers),
 ) {
-  const { context = [], timestamp, productList, product } = listClickEvent;
+  const { context: customContext, experiments, timestamp, productList, product } = listClickEvent;
+  const context = buildEventContexts(customContext, experiments);
 
   context.push({ schema: PRODUCT_SCHEMA, data: { ...product } });
 
@@ -128,11 +156,13 @@ export function trackSiteSearch(
   trackers: Array<string> = Object.keys(_trackers),
 ) {
   const {
-    context = [],
+    context: customContext,
+    experiments,
     timestamp,
     resultProducts = [],
     ...search
   } = siteSearch;
+  const context = buildEventContexts(customContext, experiments);
   resultProducts.forEach((product) =>
     context.push({ schema: PRODUCT_SCHEMA, data: { ...product } }),
   );
@@ -157,7 +187,8 @@ export function trackAddToCart(
   cart: Cart & CommonEcommerceEventProperties,
   trackers: Array<string> = Object.keys(_trackers),
 ) {
-  const { context = [], timestamp, products = [], ...cartAttributes } = cart;
+  const { context: customContext, experiments, timestamp, products = [], ...cartAttributes } = cart;
+  const context = buildEventContexts(customContext, experiments);
   products.forEach((product) => context.push({ schema: PRODUCT_SCHEMA, data: { ...product } }));
   context.push({ schema: CART_SCHEMA, data: { ...cartAttributes } });
 
@@ -176,7 +207,8 @@ export function trackRemoveFromCart(
   cart: Cart & CommonEcommerceEventProperties,
   trackers: Array<string> = Object.keys(_trackers),
 ) {
-  const { context = [], timestamp, products = [], ...cartAttributes } = cart;
+  const { context: customContext, experiments, timestamp, products = [], ...cartAttributes } = cart;
+  const context = buildEventContexts(customContext, experiments);
   products.forEach((product) => context.push({ schema: PRODUCT_SCHEMA, data: { ...product } }));
   context.push({ schema: CART_SCHEMA, data: { ...cartAttributes } });
 
@@ -196,7 +228,14 @@ export function trackTransaction(
   trackers: Array<string> = Object.keys(_trackers),
 ) {
   let totalQuantity = 0;
-  const { context = [], timestamp, products = [], ...transactionAttributes } = transaction;
+  const {
+    context: customContext,
+    experiments,
+    timestamp,
+    products = [],
+    ...transactionAttributes
+  } = transaction;
+  const context = buildEventContexts(customContext, experiments);
   products.forEach((product) => {
     /* If `total_quantity` is not provided, we calculate it from individual product quantities. */
     if (product.quantity) {
@@ -224,7 +263,8 @@ export function trackRefund(
   refund: Refund & CommonEcommerceEventProperties,
   trackers: Array<string> = Object.keys(_trackers),
 ) {
-  const { context = [], timestamp, products = [], ...refundAttributes } = refund;
+  const { context: customContext, experiments, timestamp, products = [], ...refundAttributes } = refund;
+  const context = buildEventContexts(customContext, experiments);
   products.forEach((product) => context.push({ schema: PRODUCT_SCHEMA, data: product }));
   context.push({ schema: REFUND_SCHEMA, data: { ...refundAttributes } });
 
@@ -238,7 +278,8 @@ export function trackProductDwellTime(
   productDwellTime: ProductDwell & CommonEcommerceEventProperties,
   trackers: Array<string> = Object.keys(_trackers),
 ) {
-  const { context = [], timestamp } = productDwellTime;
+  const { context: customContext, experiments, timestamp } = productDwellTime;
+  const context = buildEventContexts(customContext, experiments);
 
   context.push({
     schema: PRODUCT_SCHEMA,

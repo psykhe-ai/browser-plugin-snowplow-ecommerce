@@ -248,6 +248,34 @@ export interface User {
 export interface CommonEcommerceEventProperties<T = Record<string, unknown>> extends CommonEventProperties<T> {
   /** Add context to an event by setting an Array of Self Describing JSON */
   context?: Exclude<CommonEventProperties<T>['context'], null>;
+  /** Experiments associated with this action. Supplied per event; never persisted automatically. */
+  experiments?: Experiment[];
+}
+
+/** Additional experiment data. Values are strings or null. */
+export interface ExperimentAttribute {
+  key?: string;
+  value?: string | null;
+}
+
+/** The experiment and variation associated with an action. */
+export interface Experiment {
+  /** Stable test identifier, up to 160 characters. Use a new identifier for a distinct test run. */
+  experimentId: string;
+  /** Variation identifier, including baseline, up to 100 characters. */
+  variationId: string;
+  /** Name of the attribute used for assignment, e.g. customerId, up to 100 characters. */
+  hashAttribute?: string | null;
+  /** Original value of that assignment attribute, e.g. customer-123, up to 160 characters. */
+  hashValue?: string | null;
+  custom?: ExperimentAttribute[] | null;
+}
+
+/** Explicit exposure to one or more experiments at the caller's chosen condition. */
+export interface ExperimentExposure extends CommonEcommerceEventProperties {
+  experiments: Experiment[];
+  /** Optional description of the condition, up to 128 characters. */
+  trigger?: string;
 }
 
 export type ListViewEvent = { name: string; products: Product[] };

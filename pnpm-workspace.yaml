@@ -1,0 +1,5 @@
+packages:
+  - .
+enablePrePostScripts: true
+allowBuilds:
+  esbuild: true
