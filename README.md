@@ -10,6 +10,7 @@ Snowplow plugin for tracking ecommerce events on storefronts that use PSYKHE AI 
 
 - Tracks product views, clicks, cart changes, checkout steps, dwell, and transactions
 - Attaches PSYKHE AI recommendation context to Snowplow ecommerce events
+- Reports experiment exposure and supports concurrent experiments on ecommerce events
 - Compatible with [@snowplow/browser-tracker](https://www.npmjs.com/package/@snowplow/browser-tracker)
 
 ## Installation
@@ -140,8 +141,102 @@ self-describing event and attaches PSYKHE AI contexts.
 | `trackAddToCart()`        | Add to Cart (mandatory)             |
 | `trackTransaction()`      | Complete Transaction (mandatory)    |
 | `trackProductDwellTime()` | PDP/PLP dwell time (recommended)    |
+| `trackExperimentExposure()` | Experiment exposure (required when running experiments) |
 
 Filter dwell and hover durations as described in Getting Started > Quality Filters.
+
+### Experiment tracking
+
+Call `trackExperimentExposure()` when your integration's exposure condition occurs, such as
+opening a page or reaching 50% scroll. Send exposure for **every variant, including baseline**,
+at the same condition. Requesting recommendations does not establish exposure when your
+storefront can later suppress their display.
+
+```ts
+import {
+  trackExperimentExposure,
+  trackProductListView,
+  withRecommendIdCtx,
+  type Experiment,
+} from '@psykhe-ai/browser-plugin-snowplow-ecommerce';
+
+const experiments: Experiment[] = [
+  { experimentId: 'recommendations-2026-10', variationId: 'baseline' },
+  {
+    experimentId: 'product-layout-2026-10',
+    variationId: 'compact',
+    custom: [{ key: 'placement', value: 'product_page' }],
+  },
+];
+
+// Call when the configured exposure condition is reached.
+trackExperimentExposure({ experiments, trigger: 'scroll_50_percent' }, ['psykhe-ai']);
+
+// When a list is displayed, attach known experiments alongside recommendation context.
+trackProductListView({
+  name: 'recommendations',
+  products: [{ product_id: 'sku-123', price: 100, currency: 'usd' }],
+  context: [withRecommendIdCtx('recommendation-id')],
+  experiments,
+}, ['psykhe-ai']);
+```
+
+The plugin builds the exposure event and one context per experiment. Snowplow supplies the usual
+browser, session, page, timestamp, and event identifiers. At least one experiment is required for
+exposure. Incomplete identifiers and invalid optional fields throw `TypeError` before tracking.
+`trigger` is optional and accepts up to 128 characters; omit it when no condition description is needed.
+
+| Experiment field | Required | Type and limit |
+| --- | --- | --- |
+| `experimentId` | Yes | Nonblank string, up to 160 characters |
+| `variationId` | Yes | Nonblank string, up to 100 characters, including baseline |
+| `hashAttribute` | No | String or null, up to 100 characters |
+| `hashValue` | No | String or null, up to 160 characters |
+| `custom` | No | Array or null, with optional string `key` and string or null `value` entries |
+
+`hashAttribute` and `hashValue` describe the input your experimentation logic used to assign the
+variant. Include them when that input is available and useful for analysis. For example, when a
+test assigns variants by hashing a customer identifier:
+
+```ts
+trackExperimentExposure({
+  experiments: [{
+    experimentId: 'recommendations-2026-10',
+    variationId: 'baseline',
+    hashAttribute: 'customerId',
+    hashValue: 'customer-123',
+  }],
+  trigger: 'scroll_50_percent',
+}, ['psykhe-ai']);
+```
+
+`hashAttribute` is the attribute name; `hashValue` is its original value. You do not need to
+calculate another hash for tracking. These details can help explain assignments when the test
+uses a customer, account, or device identifier that differs from the tracker's browser identity.
+Omit these fields or use `null` if the assignment inputs are unavailable or unnecessary for
+analysis. The plugin validates supplied types and lengths without inferring assignment inputs
+or checking how the variant was chosen. Do not substitute the tracker's browser identifier
+unless you know the experiment used it for assignment. These fields do not change tracker
+identity or control traffic allocation, and can also accompany later interactions.
+
+Use stable identifiers across exposure and interaction events, and a new experiment identifier
+for a distinct test run. Missing exposure does not mean baseline. Exposure records the condition
+you chose and does not by itself prove a recommendation rendered or became visible.
+
+Every ecommerce event helper accepts optional `experiments`, including list views, clicks, cart
+actions, transactions, and dwell. These describe that interaction and do not emit another exposure.
+The plugin does not persist experiments automatically. Supply the currently applicable experiments
+on each page. When an interaction cannot include them, the separate exposure event still records
+participation using the same tracker and browser identity.
+
+For standard Snowplow functions, build contexts with `withExperimentCtx()`:
+
+```ts
+import { trackPageView } from '@snowplow/browser-tracker';
+import { withExperimentCtx } from '@psykhe-ai/browser-plugin-snowplow-ecommerce';
+
+trackPageView({ context: experiments.map(withExperimentCtx) }, ['psykhe-ai']);
+```
 
 ### Track events
 

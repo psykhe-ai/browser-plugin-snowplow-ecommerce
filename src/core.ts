@@ -1,6 +1,10 @@
 import { buildSelfDescribingEvent } from '@snowplow/tracker-core';
 
-import { ECOMMERCE_ACTION_SCHEMA, PSYKHE_PRODUCT_DWELL_TIME_SCHEMA } from './schemata.js';
+import {
+  ECOMMERCE_ACTION_SCHEMA,
+  EXPERIMENT_EXPOSURE_SCHEMA,
+  PSYKHE_PRODUCT_DWELL_TIME_SCHEMA,
+} from './schemata.js';
 import { Action, DwellAction } from './types.js';
 
 /**
@@ -24,6 +28,15 @@ export function buildDwellTimeEvent(event: DwellAction) {
     event: {
       schema: PSYKHE_PRODUCT_DWELL_TIME_SCHEMA,
       data: removeEmptyProperties({ ...event }),
+    },
+  });
+}
+
+export function buildExperimentExposureEvent(trigger?: string) {
+  return buildSelfDescribingEvent({
+    event: {
+      schema: EXPERIMENT_EXPOSURE_SCHEMA,
+      data: trigger === undefined ? {} : { trigger },
     },
   });
 }
