@@ -2,6 +2,9 @@
 
 This package is published to npm by `.github/workflows/publish.yml`.
 
+Building, testing, and publishing this repository use Node 24.x and the pnpm version pinned in `package.json`.
+The published browser plugin does not declare a Node engine requirement for storefront consumers.
+
 Publishing is triggered by publishing a GitHub Release. The workflow installs dependencies, builds the package, and runs:
 
 ```bash
